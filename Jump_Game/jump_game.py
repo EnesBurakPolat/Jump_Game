@@ -7,6 +7,7 @@ from tkinter import Tk, filedialog
 #1.Platformlar sabit ve yukarı çıktıkça aşşağı inmiyor
 #2.Player 3.platformdan sonra yukarı çıkamıyor
 #3. Resim ve Karakter yüklemelerinde buglar olabiliyor eğer boyut kötüyse scale etmek lazım her zaman belli bir standarta
+#4 kapanırken exit hatası veriyor
 
 #python -m PyInstaller --onefile --noconsole jump_game.py
 # Pygame başlangıç ayarları
