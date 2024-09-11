@@ -146,6 +146,14 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_RIGHT]:
             self.rect.x += 5
 
+        if keys[pygame.K_x] and not self.jumping:  # Zıplama kontrolü
+            self.velocity = -100  # Zıplama yüksekliği
+            self.jumping = True
+
+        if keys[pygame.K_SPACE] and not self.jumping:  # Zıplama kontrolü
+            self.velocity = -25  # Zıplama yüksekliği
+            self.jumping = True
+        
         if keys[pygame.K_UP] and not self.jumping:  # Zıplama kontrolü
             self.velocity = -25  # Zıplama yüksekliği
             self.jumping = True
