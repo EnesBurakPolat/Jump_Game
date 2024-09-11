@@ -252,7 +252,7 @@ def default_characters():
 def show_menu():
     def quit_game():
         pygame.quit()
-        exit()
+        sys.exit()
 
     global game_state
     game_state = "menu"
