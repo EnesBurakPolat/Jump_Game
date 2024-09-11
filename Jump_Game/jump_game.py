@@ -2,14 +2,13 @@ import pygame
 import random
 from pygame.locals import *
 from tkinter import Tk, filedialog
+import sys
+
 
 #Eksiklikler
-#1.Platformlar sabit ve yukarı çıktıkça aşşağı inmiyor
-#2.Player 3.platformdan sonra yukarı çıkamıyor
-#3. Resim ve Karakter yüklemelerinde buglar olabiliyor eğer boyut kötüyse scale etmek lazım her zaman belli bir standarta
-#4 kapanırken exit hatası veriyor
-
+#1. Resim ve Karakter yüklemelerinde buglar olabiliyor eğer boyut kötüyse belli bir standarta scale etmek lazım
 #python -m PyInstaller --onefile --noconsole jump_game.py
+
 # Pygame başlangıç ayarları
 pygame.init()
 pygame.font.init()
@@ -24,7 +23,7 @@ BLACK = (0, 0, 0)
 DEFAULT_COLOR = (255, 0, 0)
 BUTTON_COLOR = (0, 100, 255)
 BUTTON_HOVER_COLOR = (0, 150, 255)
-BG_COLOR = WHITE
+BG_COLOR = BLACK
 
 font = pygame.font.SysFont(None, 36)
 
@@ -45,10 +44,10 @@ def scale_image(image, width, height):
 
 # Platform sınıfı
 class Platform(pygame.sprite.Sprite):
-    def __init__(self, x, y, moving=False):
+    def __init__(self, x, y, width=150, moving=False):
         """Platform nesnesinin başlatılmasını sağlar."""
         super().__init__()
-        self.image = pygame.Surface((100, 20))  # Platformun boyutu (genişlik, yükseklik)
+        self.image = pygame.Surface((width, 20))  # Platformun boyutu (genişlik, yükseklik)
         self.image.fill((0, 255, 0))  # Platformun rengi yeşil
         self.rect = self.image.get_rect(topleft=(x, y))  # Platformun ekran üzerindeki konumu
         self.moving = moving  # Platformun hareket edip etmeyeceğini belirler
@@ -66,50 +65,56 @@ class Platform(pygame.sprite.Sprite):
         return False
 
 def create_platforms(platforms):
-    """Başlangıçta platformları oluşturur ve `platforms` grubuna ekler."""
-    for i in range(7):  # Toplamda 7 platform oluştur
-        x = random.randint(0, WIDTH - 100)  # Platformun x konumunu rastgele belirle
-        y = HEIGHT - (i + 1) * 150  # Platformun y konumunu belirle; her yeni platform daha yüksekte olacak
+    """Platformları başlangıçta yatay olarak oluşturur ve `platforms` grubuna ekler."""
+    for i in range(4):  # Platform sayısını 4'e düşürdüm
+        x = random.randint(50, WIDTH - 150)  # X konumunu yatayda daha düzgün bir aralıkta seç
+        y = HEIGHT - (i + 1) * 200  # Y ekseni için daha yüksekten başla (200 px fark)
         moving = random.choice([True, False])  # Platformun hareket edip etmeyeceğini rastgele belirle
-        platform = Platform(x, y, moving)  # Yeni bir Platform nesnesi oluştur
-        platforms.add(platform)  # Platformu `platforms` grubuna ekle
+        platform = Platform(x, y, moving=moving)  # Yeni bir platform oluştur
+        platforms.add(platform)  # Platformu platform grubuna ekle
 
 def add_platforms(platforms, player):
-    """Eksik platformları ekler ve ekranda yeni platformlar oluşturur."""
-    if len(platforms.sprites()) == 0:
-        create_platforms(platforms)  # Platformlar yoksa başlangıçta 7 platform oluştur
+    """Eksik platformları ekler ve yukarı çıktıkça yeni platformlar oluşturur."""
+    if len(platforms) < 4:  # Minimum 4 platform olmalı, azsa platform ekle
+        create_platforms(platforms)
     
-    if len(platforms.sprites()) > 0:
-        last_platform = platforms.sprites()[-1]  # Son platformu al
-        y = last_platform.rect.top - 120  # Yeni platformun y konumunu belirle; son platformdan biraz daha yüksekte
-    else:
-        y = HEIGHT - 120  # Eğer hiç platform yoksa, ekranın en altına yeni bir platform ekle
-    
-    new_platform = Platform(random.randint(0, WIDTH - 100), y)  # Yeni platform oluştur
-    platforms.add(new_platform)  # Yeni platformu `platforms` grubuna ekle
+    # Oyuncu yukarı çıkmışsa, yeni platformlar ekle
+    last_platform_y = platforms.sprites()[-1].rect.top if platforms else 0
+    if last_platform_y > player.rect.top - HEIGHT:  # Kamera yukarı çıkarken yeni platform eklenir
+        x = random.randint(50, WIDTH - 150)
+        y = last_platform_y - 200  # Platformlar arasındaki mesafeyi sabit tut (200px)
+        moving = random.choice([True, False])
+        new_platform = Platform(x, y, moving=moving)
+        platforms.add(new_platform)
+
 
 def move_camera(player, platforms):
-    """Kamera hareketini günceller ve oyuncu platformlara düzgün bir şekilde iniş yapmasını sağlar."""
-    global bg_y, score  # `bg_y` ve `score` global değişkenleri kullanılır
-    if player.rect.top < HEIGHT // 3:  # Oyuncunun üst kısmı ekranın üst üçte birine yaklaştığında
-        bg_y += HEIGHT // 3 - player.rect.top  # Arka planı yukarı kaydır
-        player.rect.top = HEIGHT // 3  # Oyuncunun üst kısmını ekranın üst üçte birine sabitle
-    
-        if background:  # Eğer bir arka plan resmi varsa
-            screen.blit(background, (0, bg_y % HEIGHT))  # Arka planı ekranda kaydır
-            screen.blit(background, (0, bg_y % HEIGHT - HEIGHT))  # Arka planın bir diğer parçasını ekle
+    """Kamera hareketini ve oyuncu ile platformlar arasındaki etkileşimi günceller."""
+    global bg_y, score
 
-        # Puanı yalnızca oyuncunun ekranın altına geçmesi durumunda artır
-        if player.rect.bottom >= HEIGHT:
-            score += 1
+    # Eğer oyuncu ekranın üst üçte birine yaklaşırsa
+    if player.rect.top < HEIGHT // 3:
+        # Arka plan kaymasını güncelle
+        offset = HEIGHT // 3 - player.rect.top
+        bg_y += offset
+        player.rect.top = HEIGHT // 3
 
-        # Oyuncu platforma düştüğünde doğru şekilde iniş yapmalı
-        for platform in pygame.sprite.groupcollide(platforms, pygame.sprite.Group(player), False, False):
-            if player.rect.bottom <= platform.rect.top + 10:  # Oyuncunun alt kısmı platformun üst kısmına yakınsa
-                player.rect.bottom = platform.rect.top  # Oyuncunun alt kısmını platformun üst kısmına sabitle
-                player.velocity = 0  # Oyuncunun hızını sıfırla
-                player.jumping = False  # Atlama durumunu sıfırla
-                break
+        # Platformları yukarı doğru kaydır
+        for platform in platforms:
+            platform.rect.y += offset
+
+        # Puan artırma: sadece oyuncu ekranın yukarısına çıktığında artır
+        score += 1
+
+    # Platformlarla çarpışma kontrolü
+    for platform in pygame.sprite.spritecollide(player, platforms, False):
+        # Oyuncu yukarıdan platforma yaklaşıyorsa, çarpışmayı hesaba kat
+        if player.velocity > 0 and player.rect.bottom <= platform.rect.bottom and player.rect.bottom >= platform.rect.top:
+            # Oyuncu platformun üstüne inse
+            player.rect.bottom = platform.rect.top
+            player.velocity = 0
+            player.jumping = False
+            break  # Daha fazla platform kontrolüne gerek yok, ilk bulduğu platforma iniyor
 
 def update_platforms(platforms, player):
     """Platformları günceller ve ekranın üstünden geçenleri kaldırır."""
@@ -120,13 +125,7 @@ def update_platforms(platforms, player):
     # Platform sayısı 7'den azsa, daha fazla platform ekle
     if len(platforms) < 7:
         add_platforms(platforms, player)
-    
-    # Son platformun y konumu ekranın üst kısmında kalıyorsa, yeni platformlar ekle
-    if platforms.sprites() and platforms.sprites()[-1].rect.top < HEIGHT:
-        add_platforms(platforms, player)
 
-
-#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Oyuncu sınıfı
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -148,7 +147,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.x += 5
 
         if keys[pygame.K_UP] and not self.jumping:  # Zıplama kontrolü
-            self.velocity = -25 #ZIPLAMA YÜKSEKLİĞİ
+            self.velocity = -25  # Zıplama yüksekliği
             self.jumping = True
 
         self.rect.y += self.velocity
@@ -180,7 +179,6 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.jumping = True  # Hava da zıplama
 
-#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Buton sınıfı
 class Button:
     def __init__(self, text, pos, action=None):
@@ -264,7 +262,7 @@ def show_menu():
     settings_button = Button("Ayarlar", (WIDTH // 2, HEIGHT // 2 - 50), show_settings)
     quit_button = Button("Çıkış", (WIDTH // 2, HEIGHT // 2 + 50), quit_game)
     buttons = [start_button, settings_button, quit_button]
-
+    
     while menu_running:
         screen.fill(BG_COLOR)
 
@@ -378,14 +376,20 @@ def show_pause_menu():
                 exit()
             for button in [resume_button, menu_button]:
                 button.check_click(event)
-#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 def start_game():
-    global game_state
+    global game_state, score, bg_y
     game_state = "playing"
+    score = 0
+    bg_y = 0
     
     player = Player()
     platforms = pygame.sprite.Group()
-    create_platforms(platforms)
+
+    # Tüm ekranı kapsayacak şekilde platform ekleme
+    create_platforms(platforms)  # İlk başta 4 platform ekler
+    bottom_platform = Platform(0, HEIGHT - 20, width=WIDTH, moving=False)  # En alt kısmı kaplayacak platform
+    platforms.add(bottom_platform)
 
     while game_state == "playing":
         screen.fill(BG_COLOR)  # Arka plan rengini doldur
@@ -393,23 +397,26 @@ def start_game():
             # Arka planı ekranda düzgün bir şekilde göster
             screen.blit(background, (0, bg_y % HEIGHT))
             screen.blit(background, (0, bg_y % HEIGHT - HEIGHT))
-        
+
+        # Player ve platformları güncelleme ve çizme
         player.update(platforms)
-        platforms.update()  # `platforms.update()` çağrısında `player` argümanı geçmeyin
+        platforms.update()  # Platformları güncelle
 
         screen.blit(player.image, player.rect)
-        platforms.draw(screen)
+        platforms.draw(screen)  # Platformları ekrana çiz
 
-        score_text = font.render(f"Puan: {score}", True, BLACK)
+        # Puan metni
+        score_text = font.render(f"Puan: {score}", True, WHITE)
         screen.blit(score_text, (10, 10))
 
+        # Ekranı güncelleme
         pygame.display.flip()
         clock.tick(FPS)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
-                exit()
+                sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     game_state = "paused"
